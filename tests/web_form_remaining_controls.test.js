@@ -4,10 +4,52 @@ import path from 'node:path';
 
 const formUrl = 'https://www.selenium.dev/selenium/web/web-form.html';
 const uploadFile = fileURLToPath(new URL('./fixtures/upload-sample.txt', import.meta.url));
+const missingUploadFile = fileURLToPath(new URL('./fixtures/missing-upload.txt', import.meta.url));
 
-test.describe('Selenium web form remaining controls', () => {
+test.describe('Selenium web form end-to-end coverage', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(formUrl);
+  });
+
+  test('Verify text input accepts a value', async ({ page }) => {
+    const textInput = page.getByRole('textbox', { name: 'Text input' });
+
+    await textInput.fill('testing');
+
+    await expect(textInput).toBeVisible();
+    await expect(textInput).toHaveValue('testing');
+  });
+
+  test('Verify password input accepts a value', async ({ page }) => {
+    const passwordInput = page.getByRole('textbox', { name: 'Password' });
+
+    await passwordInput.fill('password box');
+
+    await expect(passwordInput).toHaveValue('password box');
+  });
+
+  test('Verify disabled input cannot be edited', async ({ page }) => {
+    const disabledInput = page.getByRole('textbox', { name: 'Disabled input' });
+
+    await expect(disabledInput).toBeDisabled();
+    await expect(disabledInput).toBeEmpty();
+  });
+
+  test('Verify readonly input keeps its default value', async ({ page }) => {
+    const readonlyInput = page.getByRole('textbox', { name: 'Readonly input' });
+
+    await expect(readonlyInput).toHaveAttribute('readonly', '');
+    await expect(readonlyInput).toHaveValue('Readonly input');
+  });
+
+  test('Verify select dropdown chooses an option', async ({ page }) => {
+    const selectDropdown = page.getByLabel('Dropdown (select) Open this');
+
+    await selectDropdown.selectOption('1');
+
+    await expect(selectDropdown).toBeVisible();
+    await expect(selectDropdown).toContainText('One');
+    await expect(selectDropdown).toHaveValue('1');
   });
 
   test('Verify textarea accepts multiple lines', async ({ page }) => {
@@ -84,5 +126,76 @@ test.describe('Selenium web form remaining controls', () => {
     await expect(page).toHaveURL(/submitted-form\.html/);
     await expect(page.getByRole('heading', { name: 'Form submitted' })).toBeVisible();
     await expect(page.getByText('Received!')).toBeVisible();
+  });
+
+  test('Complete web form end-to-end flow', async ({ page }) => {
+    await page.getByRole('textbox', { name: 'Text input' }).fill('testing');
+    await page.getByRole('textbox', { name: 'Password' }).fill('password box');
+    await page.getByLabel('Textarea').fill(['first line', 'second line'].join('\n'));
+    await page.getByLabel('Dropdown (select) Open this').selectOption('1');
+    await page.getByLabel('Dropdown (datalist)').fill('San Francisco');
+    await page.getByLabel('File input').setInputFiles(uploadFile);
+    await page.getByLabel('Checked checkbox').uncheck();
+    await page.getByLabel('Default checkbox').check();
+    await page.getByLabel('Default radio').check();
+    await page.getByLabel('Color picker').fill('#00ff00');
+    await page.getByLabel('Date picker').fill('2026-07-05');
+    await page.getByLabel('Example range').fill('8');
+
+    await expect(page.getByRole('textbox', { name: 'Text input' })).toHaveValue('testing');
+    await expect(page.getByRole('textbox', { name: 'Password' })).toHaveValue('password box');
+    await expect(page.getByLabel('File input')).toHaveValue(new RegExp(`${path.basename(uploadFile)}$`));
+
+    await page.getByRole('button', { name: 'Submit' }).click();
+
+    await expect(page).toHaveURL(/submitted-form\.html/);
+    await expect(page.getByRole('heading', { name: 'Form submitted' })).toBeVisible();
+    await expect(page.getByText('Received!')).toBeVisible();
+  });
+
+  test('(N) Verify disabled input rejects typing', async ({ page }) => {
+    const disabledInput = page.getByRole('textbox', { name: 'Disabled input' });
+
+    await expect(disabledInput).toBeDisabled();
+    await expect(disabledInput.fill('blocked value', { timeout: 1000 })).rejects.toThrow();
+    await expect(disabledInput).toBeEmpty();
+  });
+
+  test('(N) Verify readonly input rejects editing', async ({ page }) => {
+    const readonlyInput = page.getByRole('textbox', { name: 'Readonly input' });
+
+    await expect(readonlyInput).toHaveValue('Readonly input');
+    await expect(readonlyInput.fill('changed value', { timeout: 1000 })).rejects.toThrow();
+    await expect(readonlyInput).toHaveValue('Readonly input');
+  });
+
+  test('(N) Verify select dropdown rejects an unknown option', async ({ page }) => {
+    const selectDropdown = page.getByLabel('Dropdown (select) Open this');
+
+    await expect(selectDropdown.selectOption('invalid-option', { timeout: 1000 })).rejects.toThrow();
+    await expect(selectDropdown).toHaveValue('Open this select menu');
+  });
+
+  test('(N) Verify color picker rejects an invalid color value', async ({ page }) => {
+    const colorPicker = page.getByLabel('Color picker');
+
+    await expect(colorPicker.fill('not-a-color')).rejects.toThrow();
+    await expect(colorPicker).not.toHaveValue('not-a-color');
+  });
+
+  test('(N) Verify date picker accepts invalid text without normalization', async ({ page }) => {
+    const datePicker = page.getByLabel('Date picker');
+
+    await datePicker.fill('not-a-date');
+
+    await expect(datePicker).toHaveValue('not-a-date');
+    await expect(datePicker).not.toHaveValue('2026-07-05');
+  });
+
+  test('(N) Verify file input rejects a missing file', async ({ page }) => {
+    const fileInput = page.getByLabel('File input');
+
+    await expect(fileInput.setInputFiles(missingUploadFile)).rejects.toThrow();
+    await expect(fileInput).toHaveValue('');
   });
 });
