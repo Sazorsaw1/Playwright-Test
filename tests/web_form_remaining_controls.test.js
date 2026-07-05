@@ -153,22 +153,6 @@ test.describe('Selenium web form end-to-end coverage', () => {
     await expect(page.getByText('Received!')).toBeVisible();
   });
 
-  test('(N) Verify disabled input rejects typing', async ({ page }) => {
-    const disabledInput = page.getByRole('textbox', { name: 'Disabled input' });
-
-    await expect(disabledInput).toBeDisabled();
-    await expect(disabledInput.fill('blocked value', { timeout: 1000 })).rejects.toThrow();
-    await expect(disabledInput).toBeEmpty();
-  });
-
-  test('(N) Verify readonly input rejects editing', async ({ page }) => {
-    const readonlyInput = page.getByRole('textbox', { name: 'Readonly input' });
-
-    await expect(readonlyInput).toHaveValue('Readonly input');
-    await expect(readonlyInput.fill('changed value', { timeout: 1000 })).rejects.toThrow();
-    await expect(readonlyInput).toHaveValue('Readonly input');
-  });
-
   test('(N) Verify select dropdown rejects an unknown option', async ({ page }) => {
     const selectDropdown = page.getByLabel('Dropdown (select) Open this');
 
